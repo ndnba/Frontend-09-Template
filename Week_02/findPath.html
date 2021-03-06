@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<style>
+    #container{
+        /* 
+            * 注意display:inline-inline-block 使用的时候包含了空格换行符等会产生间距，换行的问题
+            * 解决方法有如下：
+            * 使用float
+            * 父元素font-size:0
+         */
+        width:701px;
+        /* font-size:0 */
+        line-height: 0;
+    }
+    .cell{
+        display: inline-block;
+        width:6px;
+        height: 6px;
+        background-color: #ccc;
+        border-right: solid 1px #fff;
+        border-bottom: solid 1px #fff;
+        vertical-align: top;
+        line-height: 7px;
+        /* float: left; */
+    }
+
+</style>
+<body>
+    <div id="container"></div>
+</body>
+<button onclick="localStorage['map'] = JSON.stringify(map)">save</button>
+<script>
+    //写一个比较数组的方法
+    class Sorted{
+        constructor(data,compare){
+            this.data=data.slice();
+            this.compare = compare || ((a,b)=>a-b);
+        }
+        
+        take(){
+            if(!this.data.length){
+                return; //不能return null/undefined  可能被比较
+            }
+            let min = this.data[0];
+            let minIndex = 0;
+            for(let i = 1;i<this.data.length;i++){
+                if(this.compare(this.data[i],min) < 0){
+                    min = this.data[i];
+                    minIndex = i;
+                }  
+            }
+            this.data[minIndex] = this.data[this.data.length -1]; //splice (O(N) O(1)) 当比较出最小的数值以后，把它删除，再比较出剩余的最小的值，一直比较到最后一个数
+            this.data.pop();
+            return min;
+        }
+        give(v){
+            this.data.push(v);
+        }
+    }
+    //难点：确认算法的正确性；处理路径的问题; 最优择路的思维；
+    // 1.数组pop push(深度) and shif push（广度） 2.
+    //100*100的格子
+    let map = localStorage["map"] ? JSON.parse(localStorage["map"]): Array(10000).fill(0);
+    let container = document.getElementById("container");
+    let mousedown = false;
+    let clear = false;
+    for(let y=0;y<100;y++){
+        for( let x=0;x<100;x++){
+            let cell = document.createElement("div");
+            cell.classList.add("cell");
+
+             if(map[y*100 + x] == 1){
+                 cell.style.backgroundColor = "black";
+             }
+            cell.addEventListener('mousemove',(e)=>{
+                if(mousedown){
+                    if(clear){
+                        cell.style.backgroundColor = "";
+                        map[y*100 + x] = 0;
+                    }else{
+                        cell.style.backgroundColor = "black";
+                        map[y*100 + x] = 1;
+                    }   
+                }
+            })
+            
+                
+            container.appendChild(cell);
+        }
+    }
+    
+    document.addEventListener('mousedown',(e)=>{
+        mousedown = true;
+        if(e.which === 3)
+            clear = true;
+    });
+    document.addEventListener('mouseup',()=>{mousedown = false;clear = false})
+    // document.addEventListener('contextmenu',e=>{e.preventDefault()});
+    async function sleep(t){
+        return new  Promise(function(resolve){
+            setTimeout(resolve,t);
+        });
+    }
+    async function findPath(map,start,end){
+        // let queue = [start];//队列，先进先出
+        let table = Object.create(map);//一维数组的复制
+        let queue = new Sorted([start],(a,b)=>distance(a)-distance(b));
+
+        async function insert(x,y,pre){//插入队列中
+            //如果遇到边，则不insert
+            if(x<0 || x>=100 || y<0 || y>=100){
+                return;
+            }
+            //如果已经被绘制了或者被标记了，则不insert
+            if(table[y*100 + x]){
+                return;
+            }
+            await sleep(5);
+            container.children[y*100 + x].style.backgroundColor = "lightgreen";
+            table[y*100 + x] = pre; //table里面存的都是前一个节点
+            map[y*100 + x] =2;
+            queue.give([x,y]);
+        }
+        function distance(point){
+            return (point[0] - end[0]) ** 2 + (point[1] - end[1]) ** 2;
+        }
+        while(queue.data.length){
+            let [x,y] = queue.take();
+            console.log([x,y]);
+            //如果是最后一个位置则停止插入数据
+            if(x === end[0] && y === end[1]){
+                let path =[];
+                while(x != start[0] || y != start[1]){
+                    path.push(map[y*100 +x]);
+                    [x,y] = table[y * 100 +x];
+                    await sleep(10);
+                    container.children[y * 100 + x].style.backgroundColor = "purple";
+                }
+                return path;
+            }
+
+            await insert(x-1,y,[x,y]); //左
+            await insert(x,y-1,[x,y]); //下
+            await insert(x+1,y,[x,y]); //右
+            await insert(x,y+1,[x,y]); //上
+
+            
+            await insert(x-1,y-1,[x,y]);//左下
+            await insert(x+1,y-1,[x,y]);//右下
+            await insert(x-1,y+1,[x,y]);//左上
+            await insert(x+1,y+1,[x,y]);//右上
+            
+            
+           
+        }
+        return null;
+
+    }
+</script>
+</html>
