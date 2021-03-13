@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+ <script>
+     //在正则中（）代表了捕获
+     var regexp = /([0-9\.]+)|([ \t]+)|([\r\n]+)|(\*)|(\/)|(\+)|(\-)/g
+     var dictionary = ["Number","Whitespace","LineTerMinator","*","/","+","-"];
+    function* tokenize (source){
+        var result =null;
+        var lastIndex = 0;
+        while(true){
+            lastIndex = regexp.lastIndex;
+            result = regexp.exec(source);
+            if(!result) break; //遍历字符串最后返回null的时候则跳出
+            // console.log(regexp.lastIndex,lastIndex,result[0].length); result[0]其实得到的是匹配的每一项（1024, ,+, ,10...)
+            //regexp.lastIndex(4,5,6,7,9...) 当前匹配项的索引，lastIndex(0,4,5,6,7)上一个匹配项的索引;result[0].length(4,1,1,1,2...)
+            if(regexp.lastIndex - lastIndex > result[0].length) break;
+            let token = {
+                type:null,
+                value:null,
+            }
+            for(var i = 1;i<=dictionary.length;i++){
+                if(result[i]){
+                    token.type = dictionary[i-1];
+                }
+                
+            }
+            token.value = result[0];
+            yield token;
+            // console.log(result);
+        }
+        yield {
+            type:"EOF"
+        }
+    }
+    let source = [];
+    for(let token of tokenize("10 + 25 - 2")){//(1024 + 10 * 25)  10 * 25 / 2
+        if(token.type !== "Whitespace" &&token.type !== "LineTerMinator")
+            source.push(token);
+            /**
+             * token
+             * {type: "Number", value: "1024"}
+                {type: "Whitespace", value: " "}
+                {type: "+", value: "+"}
+                {type: "Whitespace", value: " "}
+                {type: "Number", value: "10"}
+                {type: "Whitespace", value: " "}
+                {type: "*", value: "*"}
+                {type: "Whitespace", value: " "}
+                {type: "Number", value: "25"} 
+            */
+    }
+    function Expression(tokens){
+        if(source[0].type === "AdditiveExpression" && source[1] && source[1].type === "EOF"){
+            let node = {
+                type:"Expression",
+                children:[source.shift(),source.shift()]
+            }
+            source.unshift(node);
+            return node;
+
+        }
+        AdditiveExpression(source);
+        return Expression(source);
+    }
+    function AdditiveExpression(source){
+        if(source[0].type === "MulttiplicativeExpression"){
+            let node = {
+                type:"AdditiveExpression",
+                children:[source[0]]
+            }
+            source[0] = node;
+            return AdditiveExpression(source);
+        }
+        if(source[0].type==="AdditiveExpression" && source[1] && source[1].type === "+"){
+            let node = {
+                type:"AdditiveExpression",
+                operator:"+",
+                children:[]
+            }
+            node.children.push(source.shift());
+            node.children.push(source.shift());
+            MulttiplicativeExpression(source);
+            node.children.push(source.shift());
+            source.unshift(node);
+            return AdditiveExpression(source);
+        }
+        if(source[0].type==="AdditiveExpression" && source[1] && source[1].type === "-"){
+            let node = {
+                type:"AdditiveExpression",
+                operator:"-",
+                children:[]
+            }
+            node.children.push(source.shift());
+            node.children.push(source.shift());
+            MulttiplicativeExpression(source);
+            node.children.push(source.shift());
+            source.unshift(node);
+            return AdditiveExpression(source);
+        }
+        if(source[0].type === "AdditiveExpression"){
+            return source[0];           
+        }
+        MulttiplicativeExpression(source);
+        return AdditiveExpression(source);
+    }
+    function MulttiplicativeExpression(source){
+        if(source[0].type === "Number"){
+            let node = {
+                type:"MulttiplicativeExpression",
+                children:[source[0]]
+            }
+            source[0] = node;
+            return MulttiplicativeExpression(source);
+        }
+        if(source[0].type==="MulttiplicativeExpression" && source[1] && source[1].type === "*"){
+            let node = {
+                type:"MulttiplicativeExpression",
+                operator:"*",
+                children:[]
+            }
+            node.children.push(source.shift());
+            node.children.push(source.shift());
+            node.children.push(source.shift());
+            source.unshift(node);
+            return MulttiplicativeExpression(source);
+        }
+        if(source[0].type==="MulttiplicativeExpression" && source[1] && source[1].type === "/"){
+            let node = {
+                type:"MulttiplicativeExpression",
+                operator:"/",
+                children:[]
+            }
+            node.children.push(source.shift());
+            node.children.push(source.shift());
+            node.children.push(source.shift());
+            source.unshift(node);
+            return MulttiplicativeExpression(source);
+        }
+        if(source[0].type === "MulttiplicativeExpression"){
+            return source[0];
+        }
+        return MulttiplicativeExpression(source);
+    }
+    // console.log(MulttiplicativeExpression(source));
+    // console.log(AdditiveExpression(source));
+    console.log(Expression(source));
+ </script>
+</body>
+</html>
